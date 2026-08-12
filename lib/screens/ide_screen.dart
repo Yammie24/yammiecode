@@ -25,17 +25,23 @@ class _IDEScreenState extends State<IDEScreen> {
 
   bool loading = true;
   bool saving = false;
+  bool isDirty = false;
+  bool consoleExpanded = false;
 
   String consoleOutput =
       'YammieCode Console\n'
-      '────────────────────────────\n'
-      'Project: waiting for files...\n';
+      '────────────────────────────────\n'
+      'Ready.\n';
 
   @override
   void initState() {
     super.initState();
     _loadProject();
   }
+
+  // ============================================================
+  // PROJECT
+  // ============================================================
 
   Future<void> _loadProject() async {
     setState(() {
@@ -51,14 +57,20 @@ class _IDEScreenState extends State<IDEScreen> {
 
       setState(() {
         files = loaded;
-        selectedFile = files.isEmpty
-            ? 0
-            : selectedFile.clamp(0, files.length - 1);
+
+        if (files.isEmpty) {
+          selectedFile = 0;
+        } else {
+          selectedFile =
+              selectedFile.clamp(0, files.length - 1);
+        }
+
         loading = false;
+        isDirty = false;
 
         consoleOutput =
             'YammieCode Console\n'
-            '────────────────────────────\n'
+            '────────────────────────────────\n'
             'Project: ${widget.projectName}\n'
             '${files.length} file(s) loaded.\n';
       });
@@ -70,11 +82,15 @@ class _IDEScreenState extends State<IDEScreen> {
 
         consoleOutput =
             'ERROR\n'
-            '────────────────────────────\n'
+            '────────────────────────────────\n'
             '$error';
       });
     }
   }
+
+  // ============================================================
+  // SAVE
+  // ============================================================
 
   Future<void> _save() async {
     if (files.isEmpty || saving) return;
@@ -93,18 +109,17 @@ class _IDEScreenState extends State<IDEScreen> {
 
       setState(() {
         saving = false;
+        isDirty = false;
 
         consoleOutput =
             'YammieCode Console\n'
-            '────────────────────────────\n'
+            '────────────────────────────────\n'
             '✓ Saved ${files[selectedFile].name}\n';
       });
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('File saved'),
-          duration: Duration(seconds: 1),
-        ),
+      _showMessage(
+        'Saved ${files[selectedFile].name}',
+        Icons.check_circle_outline,
       );
     } catch (error) {
       if (!mounted) return;
@@ -114,30 +129,54 @@ class _IDEScreenState extends State<IDEScreen> {
 
         consoleOutput =
             'SAVE ERROR\n'
-            '────────────────────────────\n'
+            '────────────────────────────────\n'
             '$error';
       });
+
+      _showError(
+        'Unable to save file',
+        error.toString(),
+      );
     }
   }
 
+  // ============================================================
+  // NEW FILE
+  // ============================================================
+
   Future<void> _newFile() async {
     final controller = TextEditingController(
-      text: 'new_file.py',
+      text: 'main.py',
     );
 
     final fileName = await showDialog<String>(
       context: context,
       builder: (context) {
         return AlertDialog(
-          title: const Text('New File'),
+          title: const Row(
+            children: [
+              Icon(Icons.note_add_outlined),
+              SizedBox(width: 10),
+              Text('New File'),
+            ],
+          ),
           content: TextField(
             controller: controller,
             autofocus: true,
+            textInputAction: TextInputAction.done,
             decoration: const InputDecoration(
               labelText: 'File name',
-              hintText: 'example.py',
-              prefixIcon: Icon(Icons.insert_drive_file),
+              hintText: 'main.py',
+              prefixIcon: Icon(Icons.insert_drive_file_outlined),
             ),
+            onSubmitted: (value) {
+              if (value.trim().isNotEmpty) {
+                Navigator.pop(
+                  context,
+                  value.trim(),
+                );
+              }
+            },
           ),
           actions: [
             TextButton(
@@ -146,7 +185,7 @@ class _IDEScreenState extends State<IDEScreen> {
               },
               child: const Text('Cancel'),
             ),
-            FilledButton(
+            FilledButton.icon(
               onPressed: () {
                 final name = controller.text.trim();
 
@@ -154,7 +193,8 @@ class _IDEScreenState extends State<IDEScreen> {
                   Navigator.pop(context, name);
                 }
               },
-              child: const Text('Create'),
+              icon: const Icon(Icons.add),
+              label: const Text('Create'),
             ),
           ],
         );
@@ -164,6 +204,19 @@ class _IDEScreenState extends State<IDEScreen> {
     controller.dispose();
 
     if (fileName == null || fileName.isEmpty) {
+      return;
+    }
+
+    // Avoid duplicate names.
+    final exists = files.any(
+      (file) => file.name == fileName,
+    );
+
+    if (exists) {
+      _showError(
+        'File already exists',
+        '"$fileName" already exists in this project.',
+      );
       return;
     }
 
@@ -184,6 +237,7 @@ class _IDEScreenState extends State<IDEScreen> {
       if (index >= 0) {
         setState(() {
           selectedFile = index;
+          isDirty = false;
         });
       }
     } catch (error) {
@@ -196,6 +250,10 @@ class _IDEScreenState extends State<IDEScreen> {
     }
   }
 
+  // ============================================================
+  // DELETE FILE
+  // ============================================================
+
   Future<void> _deleteFile() async {
     if (files.isEmpty) return;
 
@@ -205,9 +263,19 @@ class _IDEScreenState extends State<IDEScreen> {
       context: context,
       builder: (context) {
         return AlertDialog(
-          title: const Text('Delete file?'),
+          title: const Row(
+            children: [
+              Icon(
+                Icons.delete_outline,
+                color: Colors.redAccent,
+              ),
+              SizedBox(width: 10),
+              Text('Delete file?'),
+            ],
+          ),
           content: Text(
-            'Delete "${file.name}" permanently?',
+            'Delete "${file.name}" permanently?\n\n'
+            'This action cannot be undone.',
           ),
           actions: [
             TextButton(
@@ -218,7 +286,7 @@ class _IDEScreenState extends State<IDEScreen> {
             ),
             FilledButton(
               style: FilledButton.styleFrom(
-                backgroundColor: Colors.red,
+                backgroundColor: Colors.redAccent,
               ),
               onPressed: () {
                 Navigator.pop(context, true);
@@ -249,7 +317,14 @@ class _IDEScreenState extends State<IDEScreen> {
           selectedFile =
               selectedFile.clamp(0, files.length - 1);
         }
+
+        isDirty = false;
       });
+
+      _showMessage(
+        'File deleted',
+        Icons.delete_outline,
+      );
     } catch (error) {
       if (!mounted) return;
 
@@ -260,17 +335,42 @@ class _IDEScreenState extends State<IDEScreen> {
     }
   }
 
-  void _run() {
+  // ============================================================
+  // EDITOR CHANGED
+  // ============================================================
+
+  void _onEditorChanged(String value) {
     if (files.isEmpty) return;
 
     setState(() {
-      consoleOutput =
-          'YammieCode Console\n'
-          '────────────────────────────\n'
-          '▶ Running ${files[selectedFile].name}\n\n'
-          'Python execution engine is coming next.\n';
+      files[selectedFile].content = value;
+      isDirty = true;
     });
   }
+
+  // ============================================================
+  // RUN
+  // ============================================================
+
+  void _run() {
+    if (files.isEmpty) return;
+
+    final file = files[selectedFile];
+
+    setState(() {
+      consoleExpanded = true;
+
+      consoleOutput =
+          'YammieCode Console\n'
+          '────────────────────────────────\n'
+          '▶ Running ${file.name}\n\n'
+          'Python execution engine coming next.\n';
+    });
+  }
+
+  // ============================================================
+  // SEARCH
+  // ============================================================
 
   void _search() {
     final controller = TextEditingController();
@@ -279,7 +379,13 @@ class _IDEScreenState extends State<IDEScreen> {
       context: context,
       builder: (context) {
         return AlertDialog(
-          title: const Text('Search Project'),
+          title: const Row(
+            children: [
+              Icon(Icons.search),
+              SizedBox(width: 10),
+              Text('Search Project'),
+            ],
+          ),
           content: TextField(
             controller: controller,
             autofocus: true,
@@ -287,6 +393,13 @@ class _IDEScreenState extends State<IDEScreen> {
               hintText: 'Search files...',
               prefixIcon: Icon(Icons.search),
             ),
+            onSubmitted: (value) {
+              Navigator.pop(context);
+
+              if (value.trim().isNotEmpty) {
+                _performSearch(value.trim());
+              }
+            },
           ),
           actions: [
             TextButton(
@@ -302,12 +415,7 @@ class _IDEScreenState extends State<IDEScreen> {
                 Navigator.pop(context);
 
                 if (query.isNotEmpty) {
-                  setState(() {
-                    consoleOutput =
-                        'Search\n'
-                        '────────────────────────────\n'
-                        'Searching for: $query';
-                  });
+                  _performSearch(query);
                 }
               },
               child: const Text('Search'),
@@ -318,6 +426,46 @@ class _IDEScreenState extends State<IDEScreen> {
     );
   }
 
+  void _performSearch(String query) {
+    final matches = files.where((file) {
+      return file.name
+          .toLowerCase()
+          .contains(query.toLowerCase());
+    }).toList();
+
+    setState(() {
+      consoleExpanded = true;
+
+      consoleOutput =
+          'Search\n'
+          '────────────────────────────────\n'
+          'Query: $query\n'
+          '${matches.length} file(s) found.\n\n'
+          '${matches.map((file) => '• ${file.name}').join('\n')}';
+    });
+  }
+
+  // ============================================================
+  // FILE SELECTION
+  // ============================================================
+
+  void _selectFile(int index) {
+    if (index < 0 || index >= files.length) return;
+
+    setState(() {
+      selectedFile = index;
+      isDirty = false;
+    });
+
+    if (MediaQuery.sizeOf(context).width < 750) {
+      Navigator.of(context).maybePop();
+    }
+  }
+
+  // ============================================================
+  // ERROR / MESSAGE
+  // ============================================================
+
   void _showError(
     String title,
     String message,
@@ -326,7 +474,18 @@ class _IDEScreenState extends State<IDEScreen> {
       context: context,
       builder: (context) {
         return AlertDialog(
-          title: Text(title),
+          title: Row(
+            children: [
+              const Icon(
+                Icons.error_outline,
+                color: Colors.redAccent,
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(title),
+              ),
+            ],
+          ),
           content: SelectableText(message),
           actions: [
             TextButton(
@@ -341,6 +500,36 @@ class _IDEScreenState extends State<IDEScreen> {
     );
   }
 
+  void _showMessage(
+    String message,
+    IconData icon,
+  ) {
+    ScaffoldMessenger.of(context).hideCurrentSnackBar();
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        behavior: SnackBarBehavior.floating,
+        duration: const Duration(seconds: 1),
+        content: Row(
+          children: [
+            Icon(
+              icon,
+              size: 18,
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(message),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ============================================================
+  // LANGUAGE
+  // ============================================================
+
   String _languageName() {
     if (files.isEmpty) {
       return 'No file';
@@ -348,107 +537,133 @@ class _IDEScreenState extends State<IDEScreen> {
 
     final name = files[selectedFile].name.toLowerCase();
 
-    if (name.endsWith('.py')) {
-      return 'Python';
+    if (name.endsWith('.py')) return 'Python';
+    if (name.endsWith('.dart')) return 'Dart';
+    if (name.endsWith('.json')) return 'JSON';
+    if (name.endsWith('.js')) return 'JavaScript';
+    if (name.endsWith('.ts')) return 'TypeScript';
+    if (name.endsWith('.html')) return 'HTML';
+    if (name.endsWith('.css')) return 'CSS';
+    if (name.endsWith('.md')) return 'Markdown';
+    if (name.endsWith('.yaml') || name.endsWith('.yml')) {
+      return 'YAML';
     }
-
-    if (name.endsWith('.dart')) {
-      return 'Dart';
-    }
-
-    if (name.endsWith('.json')) {
-      return 'JSON';
-    }
-
-    if (name.endsWith('.js')) {
-      return 'JavaScript';
-    }
-
-    if (name.endsWith('.html')) {
-      return 'HTML';
-    }
-
-    if (name.endsWith('.css')) {
-      return 'CSS';
-    }
-
-    if (name.endsWith('.md')) {
-      return 'Markdown';
-    }
-
-    if (name.endsWith('.txt')) {
-      return 'Text';
-    }
+    if (name.endsWith('.txt')) return 'Text';
 
     return 'Plain Text';
   }
 
+  // ============================================================
+  // BUILD
+  // ============================================================
+
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: _buildAppBar(),
-      drawer: MediaQuery.sizeOf(context).width < 750
-          ? Drawer(
-              child: _buildExplorer(),
-            )
-          : null,
-      body: loading
-          ? const Center(
-              child: CircularProgressIndicator(),
-            )
-          : LayoutBuilder(
-              builder: (context, constraints) {
-                final width = constraints.maxWidth;
+    return PopScope(
+      canPop: !isDirty,
+      onPopInvokedWithResult: (didPop, result) async {
+        if (didPop || !isDirty) return;
 
-                final showExplorer = width >= 750;
-                final showConsole = width >= 1050;
+        final leave = await _confirmLeave();
 
-                return Row(
-                  children: [
-                    if (showExplorer)
-                      SizedBox(
-                        width: width >= 1200 ? 250 : 220,
-                        child: _buildExplorer(),
-                      ),
+        if (leave && context.mounted) {
+          Navigator.of(context).pop();
+        }
+      },
+      child: Scaffold(
+        backgroundColor: const Color(0xFF0D1117),
+        appBar: _buildAppBar(),
+        drawer: MediaQuery.sizeOf(context).width < 750
+            ? Drawer(
+                backgroundColor: const Color(0xFF0D1117),
+                child: SafeArea(
+                  child: _buildExplorer(),
+                ),
+              )
+            : null,
+        body: loading
+            ? const Center(
+                child: CircularProgressIndicator(),
+              )
+            : LayoutBuilder(
+                builder: (context, constraints) {
+                  final width = constraints.maxWidth;
 
-                    Expanded(
-                      child: _buildMainArea(
-                        showConsole: showConsole,
-                      ),
-                    ),
+                  final showExplorer = width >= 750;
+                  final showSideConsole = width >= 1100;
 
-                    if (showConsole)
-                      SizedBox(
-                        width: width >= 1400 ? 380 : 320,
-                        child: ConsolePanel(
-                          output: consoleOutput,
+                  return Row(
+                    children: [
+                      if (showExplorer)
+                        _buildExplorerContainer(width),
+
+                      Expanded(
+                        child: _buildWorkspace(
+                          showSideConsole: showSideConsole,
+                          width: width,
                         ),
                       ),
-                  ],
-                );
-              },
-            ),
+
+                      if (showSideConsole)
+                        _buildConsoleContainer(width),
+                    ],
+                  );
+                },
+              ),
+      ),
     );
   }
 
+  // ============================================================
+  // APP BAR
+  // ============================================================
+
   PreferredSizeWidget _buildAppBar() {
     return AppBar(
+      elevation: 0,
       backgroundColor: const Color(0xFF161B22),
+      surfaceTintColor: Colors.transparent,
       titleSpacing: 8,
+      automaticallyImplyLeading: true,
       title: Row(
         children: [
-          const Icon(
-            Icons.code_rounded,
-            color: Color(0xFF4B8BBE),
+          Container(
+            width: 32,
+            height: 32,
+            decoration: BoxDecoration(
+              color: const Color(0xFF21262D),
+              borderRadius: BorderRadius.circular(7),
+            ),
+            child: const Icon(
+              Icons.code_rounded,
+              size: 19,
+              color: Color(0xFF4B8BBE),
+            ),
           ),
-          const SizedBox(width: 8),
+          const SizedBox(width: 9),
           Flexible(
-            child: Text(
-              widget.projectName,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                fontWeight: FontWeight.bold,
-              ),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  widget.projectName,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                Text(
+                  isDirty ? 'Unsaved changes' : 'Ready',
+                  style: TextStyle(
+                    fontSize: 10,
+                    color: isDirty
+                        ? Colors.orange
+                        : Colors.grey,
+                  ),
+                ),
+              ],
             ),
           ),
         ],
@@ -458,6 +673,11 @@ class _IDEScreenState extends State<IDEScreen> {
           tooltip: 'Search',
           onPressed: _search,
           icon: const Icon(Icons.search),
+        ),
+        IconButton(
+          tooltip: 'New file',
+          onPressed: _newFile,
+          icon: const Icon(Icons.add),
         ),
         IconButton(
           tooltip: 'Save',
@@ -470,44 +690,54 @@ class _IDEScreenState extends State<IDEScreen> {
                     strokeWidth: 2,
                   ),
                 )
-              : const Icon(Icons.save_outlined),
+              : Icon(
+                  isDirty
+                      ? Icons.save
+                      : Icons.save_outlined,
+                ),
         ),
         PopupMenuButton<String>(
+          tooltip: 'More',
           onSelected: (value) {
             switch (value) {
-              case 'new':
-                _newFile();
+              case 'refresh':
+                _loadProject();
                 break;
 
               case 'delete':
                 _deleteFile();
                 break;
 
-              case 'refresh':
-                _loadProject();
+              case 'console':
+                setState(() {
+                  consoleExpanded =
+                      !consoleExpanded;
+                });
                 break;
             }
           },
           itemBuilder: (context) {
             return const [
               PopupMenuItem(
-                value: 'new',
-                child: ListTile(
-                  leading: Icon(Icons.add),
-                  title: Text('New file'),
-                ),
-              ),
-              PopupMenuItem(
                 value: 'refresh',
                 child: ListTile(
                   leading: Icon(Icons.refresh),
-                  title: Text('Refresh'),
+                  title: Text('Refresh project'),
+                ),
+              ),
+              PopupMenuItem(
+                value: 'console',
+                child: ListTile(
+                  leading: Icon(Icons.terminal),
+                  title: Text('Toggle console'),
                 ),
               ),
               PopupMenuItem(
                 value: 'delete',
                 child: ListTile(
-                  leading: Icon(Icons.delete_outline),
+                  leading: Icon(
+                    Icons.delete_outline,
+                  ),
                   title: Text('Delete file'),
                 ),
               ),
@@ -518,29 +748,49 @@ class _IDEScreenState extends State<IDEScreen> {
     );
   }
 
+  // ============================================================
+  // EXPLORER
+  // ============================================================
+
+  Widget _buildExplorerContainer(double width) {
+    return Container(
+      width: width >= 1200 ? 250 : 220,
+      decoration: const BoxDecoration(
+        color: Color(0xFF0D1117),
+        border: Border(
+          right: BorderSide(
+            color: Color(0xFF30363D),
+          ),
+        ),
+      ),
+      child: _buildExplorer(),
+    );
+  }
+
   Widget _buildExplorer() {
     return Explorer(
       files: files.map((file) => file.name).toList(),
       selectedIndex: selectedFile,
-      onFileSelected: (index) {
-        setState(() {
-          selectedFile = index;
-        });
-
-        if (MediaQuery.sizeOf(context).width < 750) {
-          Navigator.of(context).pop();
-        }
-      },
+      onFileSelected: _selectFile,
       onNewFile: _newFile,
     );
   }
 
-  Widget _buildMainArea({
-    required bool showConsole,
+  // ============================================================
+  // WORKSPACE
+  // ============================================================
+
+  Widget _buildWorkspace({
+    required bool showSideConsole,
+    required double width,
   }) {
     if (files.isEmpty) {
       return _buildEmptyEditor();
     }
+
+    final showBottomConsole =
+        !showSideConsole &&
+        (width < 1100 || consoleExpanded);
 
     return Column(
       children: [
@@ -551,25 +801,32 @@ class _IDEScreenState extends State<IDEScreen> {
             ),
             fileName: files[selectedFile].name,
             initialCode: files[selectedFile].content,
+            onChanged: _onEditorChanged,
           ),
         ),
 
         _buildBottomToolbar(),
 
-        if (!showConsole)
+        if (showBottomConsole)
           SizedBox(
-            height: 150,
+            height: width < 600 ? 130 : 180,
             child: ConsolePanel(
               output: consoleOutput,
             ),
           ),
+
+        _buildStatusBar(),
       ],
     );
   }
 
+  // ============================================================
+  // TOOLBAR
+  // ============================================================
+
   Widget _buildBottomToolbar() {
     return Container(
-      height: 54,
+      height: 52,
       padding: const EdgeInsets.symmetric(
         horizontal: 10,
       ),
@@ -586,47 +843,127 @@ class _IDEScreenState extends State<IDEScreen> {
           FilledButton.icon(
             onPressed: _run,
             icon: const Icon(
-              Icons.play_arrow,
+              Icons.play_arrow_rounded,
               size: 18,
             ),
             label: const Text('Run'),
           ),
 
-          const SizedBox(width: 8),
+          const SizedBox(width: 6),
 
           IconButton(
             tooltip: 'Save',
             onPressed: saving ? null : _save,
-            icon: const Icon(
-              Icons.save_outlined,
+            icon: Icon(
+              isDirty
+                  ? Icons.save
+                  : Icons.save_outlined,
             ),
           ),
 
           IconButton(
             tooltip: 'Search',
             onPressed: _search,
-            icon: const Icon(
-              Icons.search,
-            ),
+            icon: const Icon(Icons.search),
           ),
 
           const Spacer(),
 
-          Container(
-            padding: const EdgeInsets.symmetric(
-              horizontal: 10,
-              vertical: 5,
-            ),
-            decoration: BoxDecoration(
-              color: const Color(0xFF21262D),
-              borderRadius: BorderRadius.circular(6),
-            ),
-            child: Text(
-              _languageName(),
-              style: const TextStyle(
-                fontSize: 12,
-                color: Colors.grey,
+          if (MediaQuery.sizeOf(context).width >= 500)
+            IconButton(
+              tooltip: 'Console',
+              onPressed: () {
+                setState(() {
+                  consoleExpanded =
+                      !consoleExpanded;
+                });
+              },
+              icon: Icon(
+                consoleExpanded
+                    ? Icons.keyboard_arrow_down
+                    : Icons.terminal,
               ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  // ============================================================
+  // STATUS BAR
+  // ============================================================
+
+  Widget _buildStatusBar() {
+    return Container(
+      height: 25,
+      padding: const EdgeInsets.symmetric(
+        horizontal: 10,
+      ),
+      color: const Color(0xFF21262D),
+      child: Row(
+        children: [
+          const Icon(
+            Icons.source,
+            size: 13,
+            color: Colors.grey,
+          ),
+          const SizedBox(width: 5),
+          Text(
+            widget.projectName,
+            style: const TextStyle(
+              fontSize: 10,
+              color: Colors.grey,
+            ),
+          ),
+
+          const SizedBox(width: 12),
+
+          if (isDirty)
+            const Row(
+              children: [
+                Icon(
+                  Icons.circle,
+                  size: 6,
+                  color: Colors.orange,
+                ),
+                SizedBox(width: 5),
+                Text(
+                  'Modified',
+                  style: TextStyle(
+                    fontSize: 10,
+                    color: Colors.orange,
+                  ),
+                ),
+              ],
+            ),
+
+          const Spacer(),
+
+          Text(
+            _languageName(),
+            style: const TextStyle(
+              fontSize: 10,
+              color: Colors.grey,
+            ),
+          ),
+
+          const SizedBox(width: 12),
+
+          const Text(
+            'UTF-8',
+            style: TextStyle(
+              fontSize: 10,
+              color: Colors.grey,
+            ),
+          ),
+
+          const SizedBox(width: 12),
+
+          const Text(
+            'LF',
+            style: TextStyle(
+              fontSize: 10,
+              color: Colors.grey,
             ),
           ),
         ],
@@ -634,30 +971,118 @@ class _IDEScreenState extends State<IDEScreen> {
     );
   }
 
-  Widget _buildEmptyEditor() {
-    return Column(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        const Icon(
-          Icons.description_outlined,
-          size: 64,
-          color: Colors.grey,
-        ),
-        const SizedBox(height: 16),
-        const Text(
-          'No files in this project',
-          style: TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
+  // ============================================================
+  // SIDE CONSOLE
+  // ============================================================
+
+  Widget _buildConsoleContainer(double width) {
+    return Container(
+      width: width >= 1400 ? 380 : 320,
+      decoration: const BoxDecoration(
+        border: Border(
+          left: BorderSide(
+            color: Color(0xFF30363D),
           ),
         ),
-        const SizedBox(height: 12),
-        FilledButton.icon(
-          onPressed: _newFile,
-          icon: const Icon(Icons.add),
-          label: const Text('Create File'),
-        ),
-      ],
+      ),
+      child: ConsolePanel(
+        output: consoleOutput,
+      ),
     );
+  }
+
+  // ============================================================
+  // EMPTY STATE
+  // ============================================================
+
+  Widget _buildEmptyEditor() {
+    return Center(
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              width: 82,
+              height: 82,
+              decoration: BoxDecoration(
+                color: const Color(0xFF161B22),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: const Icon(
+                Icons.description_outlined,
+                size: 42,
+                color: Color(0xFF4B8BBE),
+              ),
+            ),
+
+            const SizedBox(height: 20),
+
+            const Text(
+              'No files in this project',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 19,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+
+            const SizedBox(height: 8),
+
+            const Text(
+              'Create a Python file to start coding.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: Colors.grey,
+                fontSize: 13,
+              ),
+            ),
+
+            const SizedBox(height: 20),
+
+            FilledButton.icon(
+              onPressed: _newFile,
+              icon: const Icon(Icons.add),
+              label: const Text('Create File'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ============================================================
+  // CONFIRM EXIT
+  // ============================================================
+
+  Future<bool> _confirmLeave() async {
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Unsaved changes'),
+          content: const Text(
+            'You have unsaved changes. '
+            'Are you sure you want to leave?',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.pop(context, false);
+              },
+              child: const Text('Stay'),
+            ),
+            FilledButton(
+              onPressed: () {
+                Navigator.pop(context, true);
+              },
+              child: const Text('Leave'),
+            ),
+          ],
+        );
+      },
+    );
+
+    return result ?? false;
   }
 }
