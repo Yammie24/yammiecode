@@ -160,10 +160,10 @@ class _EditorPanelState extends State<EditorPanel> {
             fontSize: 14,
             height: 1.55,
           ),
-          gutterStyle: const gutterStyle(
+          gutterStyle: gutterStyle(
             width: 42,
             margin: 8,
-            textStyle: TextStyle(
+            textStyle: const TextStyle(
               fontFamily: 'monospace',
               fontSize: 12,
               color: Color(0xFF6E7681),
