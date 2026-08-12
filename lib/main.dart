@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import 'screens/projects_screen.dart';
 
-import 'screens/ide_screen.dart';
-
 void main() {
   runApp(const YammieCodeApp());
 }
