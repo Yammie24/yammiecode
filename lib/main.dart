@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'screens/projects_screen.dart';
 
 import 'screens/ide_screen.dart';
 
@@ -24,7 +25,7 @@ class YammieCodeApp extends StatelessWidget {
           brightness: Brightness.dark,
         ),
       ),
-      home: const IDEScreen(),
+      home: const ProjectsScreen(),
     );
   }
 }
