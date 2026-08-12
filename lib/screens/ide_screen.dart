@@ -26,11 +26,16 @@ class _IDEScreenState extends State<IDEScreen> {
   bool loading = true;
   bool saving = false;
   bool isDirty = false;
+
+  /// Console is hidden by default to maximize editor space.
+  bool consoleVisible = false;
+
+  /// Used for mobile/tablet bottom console.
   bool consoleExpanded = false;
 
   String consoleOutput =
-      'YammieCode Console\n'
-      '────────────────────────────────\n'
+      'YammieCode Terminal\n'
+      '────────────────────────────────────\n'
       'Ready.\n';
 
   @override
@@ -44,9 +49,11 @@ class _IDEScreenState extends State<IDEScreen> {
   // ============================================================
 
   Future<void> _loadProject() async {
-    setState(() {
-      loading = true;
-    });
+    if (mounted) {
+      setState(() {
+        loading = true;
+      });
+    }
 
     try {
       final loaded = await ProjectService.loadFiles(
@@ -69,8 +76,8 @@ class _IDEScreenState extends State<IDEScreen> {
         isDirty = false;
 
         consoleOutput =
-            'YammieCode Console\n'
-            '────────────────────────────────\n'
+            'YammieCode Terminal\n'
+            '────────────────────────────────────\n'
             'Project: ${widget.projectName}\n'
             '${files.length} file(s) loaded.\n';
       });
@@ -82,7 +89,7 @@ class _IDEScreenState extends State<IDEScreen> {
 
         consoleOutput =
             'ERROR\n'
-            '────────────────────────────────\n'
+            '────────────────────────────────────\n'
             '$error';
       });
     }
@@ -112,8 +119,8 @@ class _IDEScreenState extends State<IDEScreen> {
         isDirty = false;
 
         consoleOutput =
-            'YammieCode Console\n'
-            '────────────────────────────────\n'
+            'YammieCode Terminal\n'
+            '────────────────────────────────────\n'
             '✓ Saved ${files[selectedFile].name}\n';
       });
 
@@ -129,7 +136,7 @@ class _IDEScreenState extends State<IDEScreen> {
 
         consoleOutput =
             'SAVE ERROR\n'
-            '────────────────────────────────\n'
+            '────────────────────────────────────\n'
             '$error';
       });
 
@@ -151,7 +158,7 @@ class _IDEScreenState extends State<IDEScreen> {
 
     final fileName = await showDialog<String>(
       context: context,
-      builder: (context) {
+      builder: (dialogContext) {
         return AlertDialog(
           title: const Row(
             children: [
@@ -163,16 +170,17 @@ class _IDEScreenState extends State<IDEScreen> {
           content: TextField(
             controller: controller,
             autofocus: true,
-            textInputAction: TextInputAction.done,
             decoration: const InputDecoration(
               labelText: 'File name',
               hintText: 'main.py',
-              prefixIcon: Icon(Icons.insert_drive_file_outlined),
+              prefixIcon: Icon(
+                Icons.insert_drive_file_outlined,
+              ),
             ),
             onSubmitted: (value) {
               if (value.trim().isNotEmpty) {
                 Navigator.pop(
-                  context,
+                  dialogContext,
                   value.trim(),
                 );
               }
@@ -181,7 +189,7 @@ class _IDEScreenState extends State<IDEScreen> {
           actions: [
             TextButton(
               onPressed: () {
-                Navigator.pop(context);
+                Navigator.pop(dialogContext);
               },
               child: const Text('Cancel'),
             ),
@@ -190,7 +198,10 @@ class _IDEScreenState extends State<IDEScreen> {
                 final name = controller.text.trim();
 
                 if (name.isNotEmpty) {
-                  Navigator.pop(context, name);
+                  Navigator.pop(
+                    dialogContext,
+                    name,
+                  );
                 }
               },
               icon: const Icon(Icons.add),
@@ -207,7 +218,6 @@ class _IDEScreenState extends State<IDEScreen> {
       return;
     }
 
-    // Avoid duplicate names.
     final exists = files.any(
       (file) => file.name == fileName,
     );
@@ -261,7 +271,7 @@ class _IDEScreenState extends State<IDEScreen> {
 
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (context) {
+      builder: (dialogContext) {
         return AlertDialog(
           title: const Row(
             children: [
@@ -280,7 +290,7 @@ class _IDEScreenState extends State<IDEScreen> {
           actions: [
             TextButton(
               onPressed: () {
-                Navigator.pop(context, false);
+                Navigator.pop(dialogContext, false);
               },
               child: const Text('Cancel'),
             ),
@@ -289,7 +299,7 @@ class _IDEScreenState extends State<IDEScreen> {
                 backgroundColor: Colors.redAccent,
               ),
               onPressed: () {
-                Navigator.pop(context, true);
+                Navigator.pop(dialogContext, true);
               },
               child: const Text('Delete'),
             ),
@@ -336,7 +346,7 @@ class _IDEScreenState extends State<IDEScreen> {
   }
 
   // ============================================================
-  // EDITOR CHANGED
+  // EDITOR
   // ============================================================
 
   void _onEditorChanged(String value) {
@@ -358,13 +368,28 @@ class _IDEScreenState extends State<IDEScreen> {
     final file = files[selectedFile];
 
     setState(() {
+      consoleVisible = true;
       consoleExpanded = true;
 
       consoleOutput =
-          'YammieCode Console\n'
-          '────────────────────────────────\n'
+          'YammieCode Terminal\n'
+          '────────────────────────────────────\n'
           '▶ Running ${file.name}\n\n'
           'Python execution engine coming next.\n';
+    });
+  }
+
+  // ============================================================
+  // CONSOLE
+  // ============================================================
+
+  void _toggleConsole() {
+    setState(() {
+      consoleVisible = !consoleVisible;
+
+      if (!consoleVisible) {
+        consoleExpanded = false;
+      }
     });
   }
 
@@ -377,7 +402,7 @@ class _IDEScreenState extends State<IDEScreen> {
 
     showDialog(
       context: context,
-      builder: (context) {
+      builder: (dialogContext) {
         return AlertDialog(
           title: const Row(
             children: [
@@ -394,7 +419,7 @@ class _IDEScreenState extends State<IDEScreen> {
               prefixIcon: Icon(Icons.search),
             ),
             onSubmitted: (value) {
-              Navigator.pop(context);
+              Navigator.pop(dialogContext);
 
               if (value.trim().isNotEmpty) {
                 _performSearch(value.trim());
@@ -404,7 +429,7 @@ class _IDEScreenState extends State<IDEScreen> {
           actions: [
             TextButton(
               onPressed: () {
-                Navigator.pop(context);
+                Navigator.pop(dialogContext);
               },
               child: const Text('Close'),
             ),
@@ -412,7 +437,7 @@ class _IDEScreenState extends State<IDEScreen> {
               onPressed: () {
                 final query = controller.text.trim();
 
-                Navigator.pop(context);
+                Navigator.pop(dialogContext);
 
                 if (query.isNotEmpty) {
                   _performSearch(query);
@@ -427,18 +452,20 @@ class _IDEScreenState extends State<IDEScreen> {
   }
 
   void _performSearch(String query) {
+    final lowerQuery = query.toLowerCase();
+
     final matches = files.where((file) {
-      return file.name
-          .toLowerCase()
-          .contains(query.toLowerCase());
+      return file.name.toLowerCase().contains(lowerQuery) ||
+          file.content.toLowerCase().contains(lowerQuery);
     }).toList();
 
     setState(() {
+      consoleVisible = true;
       consoleExpanded = true;
 
       consoleOutput =
-          'Search\n'
-          '────────────────────────────────\n'
+          'Search Results\n'
+          '────────────────────────────────────\n'
           'Query: $query\n'
           '${matches.length} file(s) found.\n\n'
           '${matches.map((file) => '• ${file.name}').join('\n')}';
@@ -454,7 +481,6 @@ class _IDEScreenState extends State<IDEScreen> {
 
     setState(() {
       selectedFile = index;
-      isDirty = false;
     });
 
     if (MediaQuery.sizeOf(context).width < 750) {
@@ -463,7 +489,7 @@ class _IDEScreenState extends State<IDEScreen> {
   }
 
   // ============================================================
-  // ERROR / MESSAGE
+  // MESSAGES
   // ============================================================
 
   void _showError(
@@ -472,7 +498,7 @@ class _IDEScreenState extends State<IDEScreen> {
   ) {
     showDialog(
       context: context,
-      builder: (context) {
+      builder: (dialogContext) {
         return AlertDialog(
           title: Row(
             children: [
@@ -490,7 +516,7 @@ class _IDEScreenState extends State<IDEScreen> {
           actions: [
             TextButton(
               onPressed: () {
-                Navigator.pop(context);
+                Navigator.pop(dialogContext);
               },
               child: const Text('OK'),
             ),
@@ -512,10 +538,7 @@ class _IDEScreenState extends State<IDEScreen> {
         duration: const Duration(seconds: 1),
         content: Row(
           children: [
-            Icon(
-              icon,
-              size: 18,
-            ),
+            Icon(icon, size: 18),
             const SizedBox(width: 10),
             Expanded(
               child: Text(message),
@@ -531,11 +554,10 @@ class _IDEScreenState extends State<IDEScreen> {
   // ============================================================
 
   String _languageName() {
-    if (files.isEmpty) {
-      return 'No file';
-    }
+    if (files.isEmpty) return 'No file';
 
-    final name = files[selectedFile].name.toLowerCase();
+    final name =
+        files[selectedFile].name.toLowerCase();
 
     if (name.endsWith('.py')) return 'Python';
     if (name.endsWith('.dart')) return 'Dart';
@@ -545,7 +567,8 @@ class _IDEScreenState extends State<IDEScreen> {
     if (name.endsWith('.html')) return 'HTML';
     if (name.endsWith('.css')) return 'CSS';
     if (name.endsWith('.md')) return 'Markdown';
-    if (name.endsWith('.yaml') || name.endsWith('.yml')) {
+    if (name.endsWith('.yaml') ||
+        name.endsWith('.yml')) {
       return 'YAML';
     }
     if (name.endsWith('.txt')) return 'Text';
@@ -559,6 +582,11 @@ class _IDEScreenState extends State<IDEScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final width = MediaQuery.sizeOf(context).width;
+
+    final isMobile = width < 750;
+    final isDesktop = width >= 1100;
+
     return PopScope(
       canPop: !isDirty,
       onPopInvokedWithResult: (didPop, result) async {
@@ -573,9 +601,10 @@ class _IDEScreenState extends State<IDEScreen> {
       child: Scaffold(
         backgroundColor: const Color(0xFF0D1117),
         appBar: _buildAppBar(),
-        drawer: MediaQuery.sizeOf(context).width < 750
+        drawer: isMobile
             ? Drawer(
-                backgroundColor: const Color(0xFF0D1117),
+                backgroundColor:
+                    const Color(0xFF0D1117),
                 child: SafeArea(
                   child: _buildExplorer(),
                 ),
@@ -587,25 +616,35 @@ class _IDEScreenState extends State<IDEScreen> {
               )
             : LayoutBuilder(
                 builder: (context, constraints) {
-                  final width = constraints.maxWidth;
+                  final availableWidth =
+                      constraints.maxWidth;
 
-                  final showExplorer = width >= 750;
-                  final showSideConsole = width >= 1100;
+                  final showExplorer =
+                      availableWidth >= 750;
+
+                  final showSideConsole =
+                      availableWidth >= 1250 &&
+                      consoleVisible;
 
                   return Row(
                     children: [
                       if (showExplorer)
-                        _buildExplorerContainer(width),
+                        _buildExplorerContainer(
+                          availableWidth,
+                        ),
 
                       Expanded(
                         child: _buildWorkspace(
-                          showSideConsole: showSideConsole,
-                          width: width,
+                          width: availableWidth,
+                          showSideConsole:
+                              showSideConsole,
                         ),
                       ),
 
                       if (showSideConsole)
-                        _buildConsoleContainer(width),
+                        _buildConsoleContainer(
+                          availableWidth,
+                        ),
                     ],
                   );
                 },
@@ -624,7 +663,6 @@ class _IDEScreenState extends State<IDEScreen> {
       backgroundColor: const Color(0xFF161B22),
       surfaceTintColor: Colors.transparent,
       titleSpacing: 8,
-      automaticallyImplyLeading: true,
       title: Row(
         children: [
           Container(
@@ -643,8 +681,10 @@ class _IDEScreenState extends State<IDEScreen> {
           const SizedBox(width: 9),
           Flexible(
             child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment:
+                  MainAxisAlignment.center,
+              crossAxisAlignment:
+                  CrossAxisAlignment.start,
               children: [
                 Text(
                   widget.projectName,
@@ -655,7 +695,9 @@ class _IDEScreenState extends State<IDEScreen> {
                   ),
                 ),
                 Text(
-                  isDirty ? 'Unsaved changes' : 'Ready',
+                  isDirty
+                      ? 'Unsaved changes'
+                      : '${files.length} files',
                   style: TextStyle(
                     fontSize: 10,
                     color: isDirty
@@ -674,11 +716,25 @@ class _IDEScreenState extends State<IDEScreen> {
           onPressed: _search,
           icon: const Icon(Icons.search),
         ),
+
         IconButton(
           tooltip: 'New file',
           onPressed: _newFile,
           icon: const Icon(Icons.add),
         ),
+
+        IconButton(
+          tooltip: consoleVisible
+              ? 'Hide terminal'
+              : 'Show terminal',
+          onPressed: _toggleConsole,
+          icon: Icon(
+            consoleVisible
+                ? Icons.keyboard_arrow_down
+                : Icons.terminal,
+          ),
+        ),
+
         IconButton(
           tooltip: 'Save',
           onPressed: saving ? null : _save,
@@ -686,7 +742,8 @@ class _IDEScreenState extends State<IDEScreen> {
               ? const SizedBox(
                   width: 18,
                   height: 18,
-                  child: CircularProgressIndicator(
+                  child:
+                      CircularProgressIndicator(
                     strokeWidth: 2,
                   ),
                 )
@@ -696,6 +753,7 @@ class _IDEScreenState extends State<IDEScreen> {
                       : Icons.save_outlined,
                 ),
         ),
+
         PopupMenuButton<String>(
           tooltip: 'More',
           onSelected: (value) {
@@ -708,11 +766,8 @@ class _IDEScreenState extends State<IDEScreen> {
                 _deleteFile();
                 break;
 
-              case 'console':
-                setState(() {
-                  consoleExpanded =
-                      !consoleExpanded;
-                });
+              case 'terminal':
+                _toggleConsole();
                 break;
             }
           },
@@ -721,15 +776,19 @@ class _IDEScreenState extends State<IDEScreen> {
               PopupMenuItem(
                 value: 'refresh',
                 child: ListTile(
-                  leading: Icon(Icons.refresh),
-                  title: Text('Refresh project'),
+                  leading:
+                      Icon(Icons.refresh),
+                  title:
+                      Text('Refresh project'),
                 ),
               ),
               PopupMenuItem(
-                value: 'console',
+                value: 'terminal',
                 child: ListTile(
-                  leading: Icon(Icons.terminal),
-                  title: Text('Toggle console'),
+                  leading:
+                      Icon(Icons.terminal),
+                  title:
+                      Text('Toggle terminal'),
                 ),
               ),
               PopupMenuItem(
@@ -738,7 +797,8 @@ class _IDEScreenState extends State<IDEScreen> {
                   leading: Icon(
                     Icons.delete_outline,
                   ),
-                  title: Text('Delete file'),
+                  title:
+                      Text('Delete file'),
                 ),
               ),
             ];
@@ -754,7 +814,7 @@ class _IDEScreenState extends State<IDEScreen> {
 
   Widget _buildExplorerContainer(double width) {
     return Container(
-      width: width >= 1200 ? 250 : 220,
+      width: width >= 1400 ? 270 : 235,
       decoration: const BoxDecoration(
         color: Color(0xFF0D1117),
         border: Border(
@@ -769,6 +829,7 @@ class _IDEScreenState extends State<IDEScreen> {
 
   Widget _buildExplorer() {
     return Explorer(
+      projectName: widget.projectName,
       files: files.map((file) => file.name).toList(),
       selectedIndex: selectedFile,
       onFileSelected: _selectFile,
@@ -781,16 +842,14 @@ class _IDEScreenState extends State<IDEScreen> {
   // ============================================================
 
   Widget _buildWorkspace({
-    required bool showSideConsole,
     required double width,
+    required bool showSideConsole,
   }) {
     if (files.isEmpty) {
       return _buildEmptyEditor();
     }
 
-    final showBottomConsole =
-        !showSideConsole &&
-        (width < 1100 || consoleExpanded);
+    final isMobile = width < 750;
 
     return Column(
       children: [
@@ -799,21 +858,29 @@ class _IDEScreenState extends State<IDEScreen> {
             key: ValueKey(
               files[selectedFile].name,
             ),
-            fileName: files[selectedFile].name,
-            initialCode: files[selectedFile].content,
-            onChanged: _onEditorChanged,
+            fileName:
+                files[selectedFile].name,
+            initialCode:
+                files[selectedFile].content,
+            onChanged:
+                _onEditorChanged,
           ),
         ),
 
-        _buildBottomToolbar(),
+        _buildEditorToolbar(),
 
-        if (showBottomConsole)
+        if (!showSideConsole &&
+            consoleVisible &&
+            consoleExpanded)
           SizedBox(
-            height: width < 600 ? 130 : 180,
-            child: ConsolePanel(
-              output: consoleOutput,
-            ),
+            height: isMobile ? 150 : 210,
+            child: _buildBottomConsole(),
           ),
+
+        if (!showSideConsole &&
+            consoleVisible &&
+            !consoleExpanded)
+          _buildTerminalCollapsedBar(),
 
         _buildStatusBar(),
       ],
@@ -821,15 +888,14 @@ class _IDEScreenState extends State<IDEScreen> {
   }
 
   // ============================================================
-  // TOOLBAR
+  // EDITOR TOOLBAR
   // ============================================================
 
-  Widget _buildBottomToolbar() {
+  Widget _buildEditorToolbar() {
     return Container(
-      height: 52,
-      padding: const EdgeInsets.symmetric(
-        horizontal: 10,
-      ),
+      height: 50,
+      padding:
+          const EdgeInsets.symmetric(horizontal: 10),
       decoration: const BoxDecoration(
         color: Color(0xFF161B22),
         border: Border(
@@ -853,7 +919,8 @@ class _IDEScreenState extends State<IDEScreen> {
 
           IconButton(
             tooltip: 'Save',
-            onPressed: saving ? null : _save,
+            onPressed:
+                saving ? null : _save,
             icon: Icon(
               isDirty
                   ? Icons.save
@@ -864,26 +931,195 @@ class _IDEScreenState extends State<IDEScreen> {
           IconButton(
             tooltip: 'Search',
             onPressed: _search,
-            icon: const Icon(Icons.search),
+            icon:
+                const Icon(Icons.search),
           ),
 
           const Spacer(),
 
-          if (MediaQuery.sizeOf(context).width >= 500)
-            IconButton(
-              tooltip: 'Console',
-              onPressed: () {
-                setState(() {
-                  consoleExpanded =
-                      !consoleExpanded;
-                });
-              },
-              icon: Icon(
-                consoleExpanded
-                    ? Icons.keyboard_arrow_down
-                    : Icons.terminal,
+          Text(
+            _languageName(),
+            style: const TextStyle(
+              fontSize: 11,
+              color: Colors.grey,
+            ),
+          ),
+
+          const SizedBox(width: 10),
+
+          IconButton(
+            tooltip: consoleVisible
+                ? 'Hide terminal'
+                : 'Show terminal',
+            onPressed: _toggleConsole,
+            icon: Icon(
+              consoleVisible
+                  ? Icons.keyboard_arrow_down
+                  : Icons.terminal_outlined,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ============================================================
+  // TERMINAL
+  // ============================================================
+
+  Widget _buildBottomConsole() {
+    return Container(
+      decoration: const BoxDecoration(
+        color: Color(0xFF0D1117),
+        border: Border(
+          top: BorderSide(
+            color: Color(0xFF30363D),
+          ),
+        ),
+      ),
+      child: Column(
+        children: [
+          _buildTerminalHeader(),
+          Expanded(
+            child: ConsolePanel(
+              output: consoleOutput,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTerminalHeader() {
+    return Container(
+      height: 34,
+      color: const Color(0xFF161B22),
+      padding:
+          const EdgeInsets.symmetric(horizontal: 12),
+      child: Row(
+        children: [
+          const Icon(
+            Icons.terminal,
+            size: 15,
+            color: Colors.grey,
+          ),
+          const SizedBox(width: 7),
+          const Text(
+            'TERMINAL',
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              letterSpacing: .7,
+            ),
+          ),
+          const Spacer(),
+          IconButton(
+            tooltip: 'Collapse terminal',
+            padding: EdgeInsets.zero,
+            constraints:
+                const BoxConstraints(
+              minWidth: 28,
+              minHeight: 28,
+            ),
+            onPressed: () {
+              setState(() {
+                consoleExpanded = false;
+              });
+            },
+            icon: const Icon(
+              Icons.keyboard_arrow_down,
+              size: 18,
+            ),
+          ),
+          IconButton(
+            tooltip: 'Close terminal',
+            padding: EdgeInsets.zero,
+            constraints:
+                const BoxConstraints(
+              minWidth: 28,
+              minHeight: 28,
+            ),
+            onPressed: () {
+              setState(() {
+                consoleVisible = false;
+                consoleExpanded = false;
+              });
+            },
+            icon: const Icon(
+              Icons.close,
+              size: 16,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTerminalCollapsedBar() {
+    return InkWell(
+      onTap: () {
+        setState(() {
+          consoleExpanded = true;
+        });
+      },
+      child: Container(
+        height: 30,
+        padding:
+            const EdgeInsets.symmetric(horizontal: 12),
+        decoration: const BoxDecoration(
+          color: Color(0xFF161B22),
+          border: Border(
+            top: BorderSide(
+              color: Color(0xFF30363D),
+            ),
+          ),
+        ),
+        child: Row(
+          children: [
+            const Icon(
+              Icons.terminal,
+              size: 14,
+              color: Colors.grey,
+            ),
+            const SizedBox(width: 7),
+            const Text(
+              'TERMINAL',
+              style: TextStyle(
+                fontSize: 10,
+                letterSpacing: .7,
+                color: Colors.grey,
               ),
             ),
+            const Spacer(),
+            const Icon(
+              Icons.keyboard_arrow_up,
+              size: 17,
+              color: Colors.grey,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildConsoleContainer(double width) {
+    return Container(
+      width: width >= 1500 ? 400 : 350,
+      decoration: const BoxDecoration(
+        border: Border(
+          left: BorderSide(
+            color: Color(0xFF30363D),
+          ),
+        ),
+      ),
+      child: Column(
+        children: [
+          _buildTerminalHeader(),
+          Expanded(
+            child: ConsolePanel(
+              output: consoleOutput,
+            ),
+          ),
         ],
       ),
     );
@@ -896,9 +1132,8 @@ class _IDEScreenState extends State<IDEScreen> {
   Widget _buildStatusBar() {
     return Container(
       height: 25,
-      padding: const EdgeInsets.symmetric(
-        horizontal: 10,
-      ),
+      padding:
+          const EdgeInsets.symmetric(horizontal: 10),
       color: const Color(0xFF21262D),
       child: Row(
         children: [
@@ -908,34 +1143,33 @@ class _IDEScreenState extends State<IDEScreen> {
             color: Colors.grey,
           ),
           const SizedBox(width: 5),
-          Text(
-            widget.projectName,
-            style: const TextStyle(
-              fontSize: 10,
-              color: Colors.grey,
+          Flexible(
+            child: Text(
+              widget.projectName,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                fontSize: 10,
+                color: Colors.grey,
+              ),
             ),
           ),
 
-          const SizedBox(width: 12),
-
-          if (isDirty)
-            const Row(
-              children: [
-                Icon(
-                  Icons.circle,
-                  size: 6,
-                  color: Colors.orange,
-                ),
-                SizedBox(width: 5),
-                Text(
-                  'Modified',
-                  style: TextStyle(
-                    fontSize: 10,
-                    color: Colors.orange,
-                  ),
-                ),
-              ],
+          if (isDirty) ...[
+            const SizedBox(width: 12),
+            const Icon(
+              Icons.circle,
+              size: 6,
+              color: Colors.orange,
             ),
+            const SizedBox(width: 5),
+            const Text(
+              'Modified',
+              style: TextStyle(
+                fontSize: 10,
+                color: Colors.orange,
+              ),
+            ),
+          ],
 
           const Spacer(),
 
@@ -972,26 +1206,6 @@ class _IDEScreenState extends State<IDEScreen> {
   }
 
   // ============================================================
-  // SIDE CONSOLE
-  // ============================================================
-
-  Widget _buildConsoleContainer(double width) {
-    return Container(
-      width: width >= 1400 ? 380 : 320,
-      decoration: const BoxDecoration(
-        border: Border(
-          left: BorderSide(
-            color: Color(0xFF30363D),
-          ),
-        ),
-      ),
-      child: ConsolePanel(
-        output: consoleOutput,
-      ),
-    );
-  }
-
-  // ============================================================
   // EMPTY STATE
   // ============================================================
 
@@ -1000,14 +1214,16 @@ class _IDEScreenState extends State<IDEScreen> {
       child: SingleChildScrollView(
         padding: const EdgeInsets.all(24),
         child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisAlignment:
+              MainAxisAlignment.center,
           children: [
             Container(
               width: 82,
               height: 82,
               decoration: BoxDecoration(
                 color: const Color(0xFF161B22),
-                borderRadius: BorderRadius.circular(20),
+                borderRadius:
+                    BorderRadius.circular(20),
               ),
               child: const Icon(
                 Icons.description_outlined,
@@ -1030,7 +1246,7 @@ class _IDEScreenState extends State<IDEScreen> {
             const SizedBox(height: 8),
 
             const Text(
-              'Create a Python file to start coding.',
+              'Create a file to start coding.',
               textAlign: TextAlign.center,
               style: TextStyle(
                 color: Colors.grey,
@@ -1043,7 +1259,8 @@ class _IDEScreenState extends State<IDEScreen> {
             FilledButton.icon(
               onPressed: _newFile,
               icon: const Icon(Icons.add),
-              label: const Text('Create File'),
+              label:
+                  const Text('Create File'),
             ),
           ],
         ),
@@ -1052,15 +1269,16 @@ class _IDEScreenState extends State<IDEScreen> {
   }
 
   // ============================================================
-  // CONFIRM EXIT
+  // EXIT
   // ============================================================
 
   Future<bool> _confirmLeave() async {
     final result = await showDialog<bool>(
       context: context,
-      builder: (context) {
+      builder: (dialogContext) {
         return AlertDialog(
-          title: const Text('Unsaved changes'),
+          title:
+              const Text('Unsaved changes'),
           content: const Text(
             'You have unsaved changes. '
             'Are you sure you want to leave?',
@@ -1068,13 +1286,19 @@ class _IDEScreenState extends State<IDEScreen> {
           actions: [
             TextButton(
               onPressed: () {
-                Navigator.pop(context, false);
+                Navigator.pop(
+                  dialogContext,
+                  false,
+                );
               },
               child: const Text('Stay'),
             ),
             FilledButton(
               onPressed: () {
-                Navigator.pop(context, true);
+                Navigator.pop(
+                  dialogContext,
+                  true,
+                );
               },
               child: const Text('Leave'),
             ),
