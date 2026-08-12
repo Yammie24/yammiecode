@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_code_editor/flutter_code_editor.dart';
-import 'package:flutter_highlight/themes/github-dark.dart';
+import 'package:flutter_highlight/themes/monokai-sublime.dart';
 import 'package:highlight/languages/python.dart';
 
 class EditorPanel extends StatefulWidget {
@@ -74,7 +74,7 @@ class _EditorPanelState extends State<EditorPanel> {
         Expanded(
           child: CodeTheme(
             data: CodeThemeData(
-              styles: githubDarkTheme,
+              styles: monokaiSublimeTheme,
             ),
             child: SingleChildScrollView(
               child: CodeField(
