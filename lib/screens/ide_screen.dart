@@ -585,7 +585,6 @@ class _IDEScreenState extends State<IDEScreen> {
     final width = MediaQuery.sizeOf(context).width;
 
     final isMobile = width < 750;
-    final isDesktop = width >= 1100;
 
     return PopScope(
       canPop: !isDirty,
@@ -830,7 +829,7 @@ class _IDEScreenState extends State<IDEScreen> {
   Widget _buildExplorer() {
     return Explorer(
       projectName: widget.projectName,
-      files: files.map((file) => file.name).toList(),
+      files: files,
       selectedIndex: selectedFile,
       onFileSelected: _selectFile,
       onNewFile: _newFile,
