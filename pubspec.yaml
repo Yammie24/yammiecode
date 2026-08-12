@@ -1,6 +1,28 @@
+name: yammiecode
+description: A free Python IDE for Android built with Flutter.
+publish_to: "none"
+
+version: 0.2.0+1
+
+environment:
+  sdk: ^3.8.0
+  flutter: ">=3.32.0"
+
 dependencies:
   flutter:
     sdk: flutter
+
+  cupertino_icons: ^1.0.8
+
   flutter_code_editor: ^0.3.5
   flutter_highlight: ^0.7.0
   highlight: ^0.7.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+
+  flutter_lints: ^5.0.0
+
+flutter:
+  uses-material-design: true
