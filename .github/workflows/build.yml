@@ -27,7 +27,7 @@ jobs:
             --org com.yammie24 \
             --project-name yammiecode \
             .
-          rf -f test/widget_test.dart
+          rm -f test/widget_test.dart
 
 
       - name: Get dependencies
