@@ -20,7 +20,7 @@ class EditorPanel extends StatefulWidget {
 }
 
 class _EditorPanelState extends State<EditorPanel> {
-  late CodeController controller;
+  late final CodeController controller;
 
   bool modified = false;
 
@@ -37,7 +37,7 @@ class _EditorPanelState extends State<EditorPanel> {
   }
 
   void _handleChanged() {
-    if (!modified) {
+    if (mounted && !modified) {
       setState(() {
         modified = true;
       });
@@ -81,18 +81,18 @@ class _EditorPanelState extends State<EditorPanel> {
       ),
       child: Row(
         children: [
-          const SizedBox(width: 8),
+          const SizedBox(width: 10),
 
-          // Python icon
+          // File icon
           Container(
             width: 28,
             height: 28,
             decoration: BoxDecoration(
               color: const Color(0xFF1F2937),
-              borderRadius: BorderRadius.circular(5),
+              borderRadius: BorderRadius.circular(6),
             ),
             child: const Icon(
-              Icons.code,
+              Icons.code_rounded,
               size: 17,
               color: Color(0xFF4B8BBE),
             ),
@@ -103,6 +103,7 @@ class _EditorPanelState extends State<EditorPanel> {
           Flexible(
             child: Text(
               widget.fileName,
+              maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: const TextStyle(
                 fontSize: 13,
@@ -128,7 +129,7 @@ class _EditorPanelState extends State<EditorPanel> {
               'Unsaved',
               style: TextStyle(
                 fontSize: 11,
-                color: Colors.grey,
+                color: Color(0xFF8B949E),
               ),
             ),
           ],
@@ -149,26 +150,21 @@ class _EditorPanelState extends State<EditorPanel> {
         child: CodeField(
           controller: controller,
           expands: true,
+
           padding: const EdgeInsets.only(
-            left: 8,
+            left: 12,
             right: 16,
             top: 14,
             bottom: 30,
           ),
+
           textStyle: const TextStyle(
             fontFamily: 'monospace',
             fontSize: 14,
             height: 1.55,
+            color: Color(0xFFE6EDF3),
           ),
-          gutterStyle: gutterStyle(
-            width: 42,
-            margin: 8,
-            textStyle: const TextStyle(
-              fontFamily: 'monospace',
-              fontSize: 12,
-              color: Color(0xFF6E7681),
-            ),
-          ),
+
           decoration: const BoxDecoration(
             color: Color(0xFF0D1117),
           ),
